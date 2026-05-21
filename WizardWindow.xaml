@@ -1,0 +1,26 @@
+﻿<Window x:Class="WinFolderLock.WizardWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:WinFolderLock"
+        mc:Ignorable="d"
+        Title="WinFolderLock Wizard" Height="260" Width="315" WindowStartupLocation="CenterScreen" MinWidth="315" MinHeight="260">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="WinFolderLock Wizard" FontSize="18" FontWeight="Bold" Grid.Row="0" Margin="0,0,0,16" HorizontalAlignment="Center"/>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Top">
+            <Button x:Name="InstallButton" Content="Install / Repair" Height="35" Margin="0,0,0,16" Click="OnInstallClicked"/>
+            <Button x:Name="UninstallButton" Content="Uninstall" Height="35" Margin="0,0,0,16" Click="OnUninstallClicked"/>
+            <Border Background="#FF4A4A4A" Padding="8">
+                <TextBlock x:Name="ConfirmationText" FontSize="14" TextWrapping="Wrap" Foreground="White"/>
+            </Border>
+        </StackPanel>
+    </Grid>
+</Window>
