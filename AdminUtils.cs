@@ -245,7 +245,24 @@ internal static partial class AdminUtils
             return resourcePath;
         }
 
-        return Path.Combine(GetCurrentExecutableDirectoryPath(), ResourcesFolderName, resourceFileName);
+        var execDir = GetCurrentExecutableDirectoryPath();
+
+        // First check Resources subfolder next to the executable (common layout)
+        var candidateInResources = Path.Combine(execDir, ResourcesFolderName, resourceFileName);
+        if (File.Exists(candidateInResources))
+        {
+            return candidateInResources;
+        }
+
+        // Next check for the file copied directly into the output directory
+        var candidateInOutput = Path.Combine(execDir, resourceFileName);
+        if (File.Exists(candidateInOutput))
+        {
+            return candidateInOutput;
+        }
+
+        // Fallback to the Resources subfolder path (keeps previous behavior when files are installed)
+        return candidateInResources;
     }
 
     private static string GetCurrentExecutablePath()

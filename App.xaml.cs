@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Text.Json;
 using System.Windows;
 
@@ -263,6 +263,16 @@ namespace WinFolderLock
                             FolderLocker.UnlockFolder(filePath, destinationFolderPath, deleteLockedFile: true);
                             // Notify shell to refresh and show the restored folder
                             AdminUtils.NotifyShellOfChange(destinationFolderPath);
+
+                            // Remove stored password entry for this folder since it was permanently unlocked
+                            try
+                            {
+                                RemovePasswordEntry(destinationFolderPath);
+                            }
+                            catch (Exception ex)
+                            {
+                                Helper.LogError(ex);
+                            }
                         }
                     }
 
@@ -473,6 +483,40 @@ namespace WinFolderLock
 
             var entries = JsonSerializer.Deserialize<List<PasswordEntry>>(json) ?? [];
             return entries;
+        }
+
+        private static void RemovePasswordEntry(string directoryLocation)
+        {
+            if (string.IsNullOrWhiteSpace(directoryLocation))
+            {
+                return;
+            }
+
+            var normalizedDirectoryPath = Path.GetFullPath(directoryLocation).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            var entries = LoadPasswordEntries();
+            var index = entries.FindIndex(x => string.Equals(x.DirectoryLocation, normalizedDirectoryPath, StringComparison.OrdinalIgnoreCase));
+            if (index >= 0)
+            {
+                entries.RemoveAt(index);
+
+                try
+                {
+                    if (entries.Count == 0)
+                    {
+                        File.Delete(PasswordsFilePath);
+                    }
+                    else
+                    {
+                        var json = JsonSerializer.Serialize(entries, JsonSerializerOptions);
+                        File.WriteAllText(PasswordsFilePath, json);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Helper.LogError(ex);
+                }
+            }
         }
 
         private static bool IsShellWindowShowingPath(string path)

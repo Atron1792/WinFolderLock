@@ -15,13 +15,20 @@ namespace WinFolderLock
     {
         public static void ExceptionHandler(Exception ex)
         {
+            LogError(ex);
+
             string message = ex switch
             {
                 ArgumentException or IOException or UnauthorizedAccessException or JsonException or NotSupportedException or InvalidOperationException => ex.Message,
-                _ => "An unexpected error occurred."
+                _ => $"An unexpected error occurred.\n\nError: {ex.Message}"
             };
 
-            MessageBox.Show(message, "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (ex.InnerException is not null)
+            {
+                message += $"\n\nDetails: {ex.GetBaseException().Message}";
+            }
+
+            MessageBox.Show(message, "WinFolderLock Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
         public static void LogError(Exception ex)

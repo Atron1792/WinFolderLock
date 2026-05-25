@@ -28,11 +28,21 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Resources\Install.ico" />
-    <Resource Include="Resources\Locked.ico" />
-    <Resource Include="Resources\LockedWin10.ico" />
-    <Resource Include="Resources\LockedWIn11.ico" />
-    <Resource Include="Resources\Unlocked.ico" />
+    <Content Include="Resources\Install.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Locked.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\LockedWin10.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\LockedWIn11.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Unlocked.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
