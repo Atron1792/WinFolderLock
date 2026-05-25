@@ -7,6 +7,8 @@ A simple utility to protect your folders on Windows using a custom `.wflck` exte
 ## Overview
 WinFolderLock compresses and encrypts target folders into `.wflck` files. This tool ensures that without the proper password, the contents are kept hidden from casual snooping. The key used for encryption is additionally protected by the built-in Windows Data Protection API (DPAPI) for the current user.
 
+**Use at your own volition**, backup important files before locking them away. I haven't run into any problems while testing, but that doesn't mean you won't. 
+
 **Made with the help of GitHub Copilot.**
 
 ## Features
