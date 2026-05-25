@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WinFolderLock"
         mc:Ignorable="d"
-        Title="WinFolderLock Wizard" Height="260" Width="315" WindowStartupLocation="CenterScreen" MinWidth="315" MinHeight="260">
+        Title="WinFolderLock Wizard" Width="315" SizeToContent="Height" WindowStartupLocation="CenterScreen" MinWidth="315" MinHeight="260">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -19,7 +19,7 @@
             <Button x:Name="InstallButton" Content="Install / Repair" Height="35" Margin="0,0,0,16" Click="OnInstallClicked"/>
             <Button x:Name="UninstallButton" Content="Uninstall" Height="35" Margin="0,0,0,16" Click="OnUninstallClicked"/>
             <Border Background="#FF4A4A4A" Padding="8">
-                <TextBlock x:Name="ConfirmationText" FontSize="14" TextWrapping="Wrap" Foreground="White"/>
+                <TextBlock x:Name="ConfirmationText" FontSize="14" TextWrapping="Wrap" Foreground="White" VerticalAlignment="Top"/>
             </Border>
         </StackPanel>
     </Grid>

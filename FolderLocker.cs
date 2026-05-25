@@ -25,7 +25,9 @@ namespace WinFolderLock
             if (string.IsNullOrWhiteSpace(lockedFilePath)) throw new ArgumentNullException(nameof(lockedFilePath));
             if (!Directory.Exists(folderPath)) throw new DirectoryNotFoundException(folderPath);
 
-            var tempZip = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".zip");
+            string sessionDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WinFolderLock", "Sessions", Path.GetRandomFileName());
+            Directory.CreateDirectory(sessionDir);
+            var tempZip = Path.Combine(sessionDir, Path.GetRandomFileName() + ".zip");
             try
             {
                 ZipFile.CreateFromDirectory(folderPath, tempZip, CompressionLevel.Optimal, includeBaseDirectory: false);
@@ -66,7 +68,8 @@ namespace WinFolderLock
             }
             finally
             {
-                try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch (Exception ex) { ExceptionHandler.LogError(ex); }
+                try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch (Exception ex) { Helper.LogError(ex); }
+                try { if (Directory.Exists(sessionDir)) Directory.Delete(sessionDir, recursive: true); } catch (Exception ex) { Helper.LogError(ex); }
             }
         }
 
@@ -129,7 +132,7 @@ namespace WinFolderLock
             }
             finally
             {
-                try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch (Exception ex) { ExceptionHandler.LogError(ex); }
+                try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch (Exception ex) { Helper.LogError(ex); }
                 Array.Clear(key, 0, key.Length);
                 Array.Clear(plaintext, 0, plaintext.Length);
             }
@@ -147,7 +150,7 @@ namespace WinFolderLock
             }
             catch (Exception ex)
             {
-                ExceptionHandler.LogError(ex);
+                Helper.LogError(ex);
                 return false;
             }
         }
@@ -185,7 +188,7 @@ namespace WinFolderLock
             }
             catch (Exception ex)
             {
-                ExceptionHandler.LogError(ex);
+                Helper.LogError(ex);
                 // If ACL updates fail (permission issues), continue without failing the lock operation.
             }
         }
@@ -233,8 +236,10 @@ namespace WinFolderLock
                 aesgcm.Decrypt(nonce, ciphertext, tag, plaintext, null);
             }
 
-            var tempZip = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".zip");
-            var tempExtractPath = Path.Combine(Path.GetTempPath(), "WinFolderLock_Temp_" + Path.GetRandomFileName());
+            string sessionDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WinFolderLock", "Sessions", Path.GetRandomFileName());
+            Directory.CreateDirectory(sessionDir);
+            var tempZip = Path.Combine(sessionDir, Path.GetRandomFileName() + ".zip");
+            var tempExtractPath = Path.Combine(sessionDir, "extracted");
 
             try
             {
@@ -246,7 +251,7 @@ namespace WinFolderLock
             }
             finally
             {
-                try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch (Exception ex) { ExceptionHandler.LogError(ex); }
+                try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch (Exception ex) { Helper.LogError(ex); }
                 Array.Clear(key, 0, key.Length);
                 Array.Clear(plaintext, 0, plaintext.Length);
             }

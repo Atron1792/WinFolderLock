@@ -5,14 +5,6 @@ namespace WinFolderLock
 {
     public partial class PasswordInputWindow : Window
     {
-
-        public enum WindowMode
-        {
-            LockFolder,
-            UnlockFolder,
-            PermanentlyUnlockFolder
-        }
-
         public PasswordInputWindow() : this(WindowMode.LockFolder) { }
 
         public PasswordInputWindow(WindowMode mode)

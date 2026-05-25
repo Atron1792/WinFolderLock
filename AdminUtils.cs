@@ -7,8 +7,18 @@ namespace WinFolderLock;
 
 internal static partial class AdminUtils
 {
+    private const string ApplicationFolderName = "WinFolderLock";
+    private const string ResourcesFolderName = "Resources";
     private const string ContextMenuKeyPath = @"Software\Classes\Directory\shell\WinFolderLock";
     private const string ContextMenuCommandKeyPath = @"Software\Classes\Directory\shell\WinFolderLock\command";
+    private static readonly string[] InstalledResourceFileNames =
+    [
+        "Install.ico",
+        "Locked.ico",
+        "LockedWin10.ico",
+        "LockedWIn11.ico",
+        "Unlocked.ico"
+    ];
 
     // P/Invoke to notify the shell about association/context menu changes so Explorer refreshes
     [System.Runtime.InteropServices.LibraryImport("shell32.dll")]
@@ -19,7 +29,7 @@ internal static partial class AdminUtils
 
     private static void NotifyShell()
     {
-        try { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero); } catch (Exception ex) { ExceptionHandler.LogError(ex); }
+        try { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero); } catch (Exception ex) { Helper.LogError(ex); }
     }
 
     internal static void NotifyShellOfChange(string path)
@@ -37,7 +47,7 @@ internal static partial class AdminUtils
                 SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
             }
         }
-        catch (Exception ex) { ExceptionHandler.LogError(ex); }
+        catch (Exception ex) { Helper.LogError(ex); }
     }
 
     internal static bool IsRunningAsAdministrator()
@@ -49,7 +59,7 @@ internal static partial class AdminUtils
 
     internal static void AddLockFolderContextMenu()
     {
-        var executablePath = GetCurrentExecutablePath();
+        var executablePath = GetInstalledExecutablePath();
         var iconPath = GetContextMenuIconPath();
 
         Registry.CurrentUser.DeleteSubKeyTree(ContextMenuKeyPath, throwOnMissingSubKey: false);
@@ -76,22 +86,8 @@ internal static partial class AdminUtils
 
     internal static void AddUnlockFolderContextMenu()
     {
-        var executablePath = GetCurrentExecutablePath();
-        var executableDirectory = Path.GetDirectoryName(executablePath) ?? string.Empty;
-        var resourcesDir = Path.Combine(executableDirectory, "Resources");
-
-        // Ensure the WFLCK icon is present and prefer LockedWIn11.ico for .wflck files
-        var wflckIconPath = Path.Combine(resourcesDir, "LockedWIn11.ico");
-        if (!File.Exists(wflckIconPath))
-        {
-            Directory.CreateDirectory(resourcesDir);
-            var iconResource = Application.GetResourceStream(new Uri("pack://application:,,,/Resources/LockedWIn11.ico"));
-            if (iconResource != null)
-            {
-                using var iconFileStream = File.Create(wflckIconPath);
-                iconResource.Stream.CopyTo(iconFileStream);
-            }
-        }
+        var executablePath = GetInstalledExecutablePath();
+        var wflckIconPath = GetInstalledResourcePath("LockedWIn11.ico");
 
         // Register .wflck extension under HKCU so it is visible to the current user without requiring admin.
         const string extKey = @"Software\Classes\.wflck";
@@ -99,11 +95,11 @@ internal static partial class AdminUtils
         const string progIdKey = @"Software\Classes\WinFolderLock.File";
 
         try
-        {
-            Registry.CurrentUser.DeleteSubKeyTree(extKey, throwOnMissingSubKey: false);
-            Registry.CurrentUser.DeleteSubKeyTree(progIdKey, throwOnMissingSubKey: false);
-        }
-        catch (Exception ex) { ExceptionHandler.LogError(ex); }
+            {
+                Registry.CurrentUser.DeleteSubKeyTree(extKey, throwOnMissingSubKey: false);
+                Registry.CurrentUser.DeleteSubKeyTree(progIdKey, throwOnMissingSubKey: false);
+            }
+            catch (Exception ex) { Helper.LogError(ex); }
 
         using (var ext = Registry.CurrentUser.CreateSubKey(extKey))
         {
@@ -169,22 +165,8 @@ internal static partial class AdminUtils
 
     internal static void AddPermanentUnlockFolderContextMenu()
     {
-        var executablePath = GetCurrentExecutablePath();
-        var executableDirectory = Path.GetDirectoryName(executablePath) ?? string.Empty;
-        var resourcesDir = Path.Combine(executableDirectory, "Resources");
-
-        // Use Unlocked.ico for permanent unlock
-        var unlockedIconPath = Path.Combine(resourcesDir, "Unlocked.ico");
-        if (!File.Exists(unlockedIconPath))
-        {
-            Directory.CreateDirectory(resourcesDir);
-            var iconResource = Application.GetResourceStream(new Uri("pack://application:,,,/Resources/Unlocked.ico"));
-            if (iconResource != null)
-            {
-                using var iconFileStream = File.Create(unlockedIconPath);
-                iconResource.Stream.CopyTo(iconFileStream);
-            }
-        }
+        var executablePath = GetInstalledExecutablePath();
+        var unlockedIconPath = GetInstalledResourcePath("Unlocked.ico");
 
         // Register permanent unlock as a context menu entry for the ProgID (not extension)
         const string progIdKey = @"Software\Classes\WinFolderLock.File";
@@ -216,6 +198,56 @@ internal static partial class AdminUtils
         NotifyShell();
     }
 
+    internal static void InstallApplicationFiles()
+    {
+        var installDirectoryPath = GetInstallDirectoryPath();
+        if (Directory.Exists(installDirectoryPath))
+        {
+            Directory.Delete(installDirectoryPath, recursive: true);
+        }
+
+        Directory.CreateDirectory(installDirectoryPath);
+
+        var sourceDirectoryPath = GetCurrentExecutableDirectoryPath();
+        CopyDirectoryContents(sourceDirectoryPath, installDirectoryPath);
+    }
+
+    internal static void RemoveInstalledApplicationFiles()
+    {
+        var installDirectoryPath = GetInstallDirectoryPath();
+        if (Directory.Exists(installDirectoryPath))
+        {
+            Directory.Delete(installDirectoryPath, recursive: true);
+        }
+    }
+
+    private static string GetInstallDirectoryPath()
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), ApplicationFolderName);
+    }
+
+    private static string GetInstalledResourcesDirectoryPath()
+    {
+        return Path.Combine(GetInstallDirectoryPath(), ResourcesFolderName);
+    }
+
+    internal static string GetInstalledExecutablePath()
+    {
+        var installedExecutablePath = Path.Combine(GetInstallDirectoryPath(), GetCurrentExecutableFileName());
+        return File.Exists(installedExecutablePath) ? installedExecutablePath : GetCurrentExecutablePath();
+    }
+
+    private static string GetInstalledResourcePath(string resourceFileName)
+    {
+        var resourcePath = Path.Combine(GetInstalledResourcesDirectoryPath(), resourceFileName);
+        if (File.Exists(resourcePath))
+        {
+            return resourcePath;
+        }
+
+        return Path.Combine(GetCurrentExecutableDirectoryPath(), ResourcesFolderName, resourceFileName);
+    }
+
     private static string GetCurrentExecutablePath()
     {
         var executablePath = Environment.ProcessPath;
@@ -223,31 +255,49 @@ internal static partial class AdminUtils
         {
             throw new InvalidOperationException("Could not resolve executable path for context menu registration.");
         }
+
         return executablePath;
+    }
+
+    private static string GetCurrentExecutableDirectoryPath()
+    {
+        var executableDirectoryPath = Path.GetDirectoryName(GetCurrentExecutablePath());
+        if (string.IsNullOrWhiteSpace(executableDirectoryPath))
+        {
+            throw new InvalidOperationException("Could not resolve executable directory for installation.");
+        }
+
+        return executableDirectoryPath;
+    }
+
+    private static string GetCurrentExecutableFileName()
+    {
+        return Path.GetFileName(GetCurrentExecutablePath());
+    }
+
+    private static void CopyDirectoryContents(string sourceDirectoryPath, string destinationDirectoryPath)
+    {
+        foreach (var filePath in Directory.EnumerateFiles(sourceDirectoryPath))
+        {
+            if (Path.GetExtension(filePath).Equals(".pdb", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var destinationPath = Path.Combine(destinationDirectoryPath, Path.GetFileName(filePath));
+            File.Copy(filePath, destinationPath, overwrite: true);
+        }
+
+        foreach (var directoryPath in Directory.EnumerateDirectories(sourceDirectoryPath))
+        {
+            var destinationPath = Path.Combine(destinationDirectoryPath, Path.GetFileName(directoryPath));
+            Directory.CreateDirectory(destinationPath);
+            CopyDirectoryContents(directoryPath, destinationPath);
+        }
     }
 
     private static string GetContextMenuIconPath()
     {
-        var executablePath = GetCurrentExecutablePath();
-        var executableDirectory = Path.GetDirectoryName(executablePath);
-        if (string.IsNullOrWhiteSpace(executableDirectory))
-        {
-            throw new InvalidOperationException("Could not resolve executable directory for context menu icon.");
-        }
-
-        var iconDirectoryPath = Path.Combine(executableDirectory, "Resources");
-        var iconPath = Path.Combine(iconDirectoryPath, "Locked.ico");
-        if (File.Exists(iconPath))
-        {
-            return iconPath;
-        }
-
-        Directory.CreateDirectory(iconDirectoryPath);
-
-        var iconResource = Application.GetResourceStream(new Uri("pack://application:,,,/Resources/Locked.ico")) ?? throw new InvalidOperationException("Could not load embedded context menu icon resource '/Resources/Locked.ico'.");
-        using var iconFileStream = File.Create(iconPath);
-        iconResource.Stream.CopyTo(iconFileStream);
-
-        return iconPath;
+        return GetInstalledResourcePath("Locked.ico");
     }
 }

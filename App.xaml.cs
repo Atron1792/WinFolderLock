@@ -39,6 +39,24 @@ namespace WinFolderLock
                 return;
             }
 
+            // Handle maintenance operations
+            if (e.Args.Length > 0)
+            {
+                if (e.Args[0] == "/install")
+                {
+                    HandleInstall();
+                    Shutdown();
+                    return;
+                }
+
+                if (e.Args[0] == "/uninstall")
+                {
+                    HandleUninstall();
+                    Shutdown();
+                    return;
+                }
+            }
+
             // Check for command line switches for different modes
             bool isPermanentUnlock = e.Args.Length > 0 && e.Args[0] == "/permunlock";
             int fileArgIndex = isPermanentUnlock ? 1 : 0;
@@ -52,10 +70,10 @@ namespace WinFolderLock
             var filePath = e.Args[fileArgIndex];
 
             // Determine the appropriate window mode based on whether it's a file or folder
-            PasswordInputWindow.WindowMode mode = PasswordInputWindow.WindowMode.LockFolder;
+            WindowMode mode = WindowMode.LockFolder;
             if (FolderLocker.IsLockedFile(filePath))
             {
-                mode = isPermanentUnlock ? PasswordInputWindow.WindowMode.PermanentlyUnlockFolder : PasswordInputWindow.WindowMode.UnlockFolder;
+                mode = isPermanentUnlock ? WindowMode.PermanentlyUnlockFolder : WindowMode.UnlockFolder;
             }
 
             PasswordInputWindow passwordWindow = new(mode);
@@ -80,7 +98,7 @@ namespace WinFolderLock
                 }
 
                 // Validate password if unlocking
-                if (mode == PasswordInputWindow.WindowMode.UnlockFolder || mode == PasswordInputWindow.WindowMode.PermanentlyUnlockFolder)
+                if (mode == WindowMode.UnlockFolder || mode == WindowMode.PermanentlyUnlockFolder)
                 {
                     var entries = LoadPasswordEntries();
                     var lockedFileInfo = new System.IO.FileInfo(filePath);
@@ -100,7 +118,7 @@ namespace WinFolderLock
                 // Password is correct or this is a lock operation
                 try
                 {
-                    if (mode == PasswordInputWindow.WindowMode.LockFolder)
+                    if (mode == WindowMode.LockFolder)
                     {
                         // Lock folder
                         SavePasswordEntry(filePath, password);
@@ -130,100 +148,101 @@ namespace WinFolderLock
                             FolderLocker.LockFolder(normalizedDirectoryPath, lockedFilePath);
                         }
                     }
-                    else if (mode == PasswordInputWindow.WindowMode.UnlockFolder)
+                    else if (mode == WindowMode.UnlockFolder)
                     {
-                        // Temporary unlock - extract to temp location and open in Explorer
-                        var tempFolderPath = FolderLocker.UnlockFolderToTemp(filePath);
+                        // Temporary unlock - extract to an app-managed session folder and open in Explorer
+                        var sessionFolderPath = FolderLocker.UnlockFolderToTemp(filePath);
 
-                        // Open the temp folder in Windows Explorer
-                        var explorerProcess = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        // Launch Explorer to the session folder in a new window
+                        try
                         {
-                            FileName = "explorer.exe",
-                            Arguments = tempFolderPath,
-                            UseShellExecute = true
-                        });
-
-                        // Wait for Explorer window to close, then re-lock the modified contents
-                        if (explorerProcess != null)
-                        {
-                            explorerProcess.WaitForExit();
-
-                            // Wait for all Explorer processes to release the temp folder
-                            int explorerWaitAttempts = 0;
-                            const int maxExplorerWaitAttempts = 10;
-                            while (explorerWaitAttempts < maxExplorerWaitAttempts)
+                            _ = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                             {
-                                try
-                                {
-                                    // Check if temp folder is still in use by attempting to access it
-                                    if (Directory.Exists(tempFolderPath))
-                                    {
-                                        _ = Directory.GetFiles(tempFolderPath);
-                                    }
-                                    break; // Folder is accessible, Explorer has released it
-                                }
-                                catch
-                                {
-                                    explorerWaitAttempts++;
-                                    if (explorerWaitAttempts < maxExplorerWaitAttempts)
-                                    {
-                                        System.Threading.Thread.Sleep(200); // Wait and retry
-                                    }
-                                }
-                            }
+                                FileName = "explorer.exe",
+                                Arguments = "/n,\"" + sessionFolderPath + "\"",
+                                UseShellExecute = true
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            Helper.ExceptionHandler(ex);
+                            MessageBox.Show($"Could not open Explorer for the session folder: {ex.Message}", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
 
-                            // Re-lock the modified temp folder back to the original .wflck file
+                        // Automatically re-lock after the Explorer window(s) showing the session folder are closed
+                        const int pollMs = 500;
+                        int consecutiveNoWindowMs = 0;
+                        const int requiredNoWindowMs = 1500;
+
+                        while (true)
+                        {
                             try
                             {
-                                FolderLocker.LockFolder(tempFolderPath, filePath, overwriteExisting: true);
-                            }
-                            catch (Exception ex)
-                            {
-                                ExceptionHandler.Handle(ex);
-                            }
-                            finally
-                            {
-                                // Clean up temp folder and files with retry logic
-                                try
+                                if (!IsShellWindowShowingPath(sessionFolderPath))
                                 {
-                                    if (Directory.Exists(tempFolderPath))
-                                    {
-                                        // Give the system another moment to fully release locks
-                                        System.Threading.Thread.Sleep(200);
+                                    consecutiveNoWindowMs += pollMs;
+                                }
+                                else
+                                {
+                                    consecutiveNoWindowMs = 0;
+                                }
 
-                                        // Retry deletion with delay if it fails
-                                        int retryCount = 0;
-                                        const int maxRetries = 3;
-                                        while (retryCount < maxRetries)
+                                if (consecutiveNoWindowMs >= requiredNoWindowMs)
+                                {
+                                    // attempt to re-lock with retries if files are in use
+                                    int attempts = 0;
+                                    const int maxAttempts = 10;
+                                    const int attemptDelayMs = 300;
+                                    bool relocked = false;
+
+                                    while (attempts < maxAttempts)
+                                    {
+                                        try
                                         {
-                                            try
-                                            {
-                                                Directory.Delete(tempFolderPath, recursive: true);
-                                                break; // Success, exit retry loop
-                                            }
-                                            catch (Exception deleteEx)
-                                            {
-                                                retryCount++;
-                                                if (retryCount < maxRetries)
-                                                {
-                                                    System.Threading.Thread.Sleep(200 * retryCount); // Exponential backoff
-                                                }
-                                                else
-                                                {
-                                                    ExceptionHandler.LogError(deleteEx);
-                                                }
-                                            }
+                                            FolderLocker.LockFolder(sessionFolderPath, filePath, overwriteExisting: true);
+                                            relocked = true;
+                                            break;
+                                        }
+                                        catch (IOException)
+                                        {
+                                            attempts++;
+                                            System.Threading.Thread.Sleep(attemptDelayMs);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Helper.ExceptionHandler(ex);
+                                            break;
                                         }
                                     }
+
+                                    if (relocked)
+                                    {
+                                        try { AdminUtils.NotifyShellOfChange(Path.GetDirectoryName(filePath) ?? string.Empty); } catch { }
+                                    }
+
+                                    break;
                                 }
-                                catch (Exception ex)
+                            }
+                            catch { }
+
+                            System.Threading.Thread.Sleep(pollMs);
+                        }
+
+                        // Clean up all session folders after the session
+                        try
+                        {
+                            var sessionsRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WinFolderLock", "Sessions");
+                            if (Directory.Exists(sessionsRoot))
+                            {
+                                foreach (var dir in Directory.EnumerateDirectories(sessionsRoot))
                                 {
-                                    ExceptionHandler.LogError(ex);
+                                    try { Directory.Delete(dir, recursive: true); } catch { }
                                 }
                             }
                         }
+                        catch { }
                     }
-                    else if (mode == PasswordInputWindow.WindowMode.PermanentlyUnlockFolder)
+                    else if (mode == WindowMode.PermanentlyUnlockFolder)
                     {
                         // Permanent unlock (extract and delete .wflck file)
                         var destinationFolderPath = Path.GetDirectoryName(filePath);
@@ -251,37 +270,140 @@ namespace WinFolderLock
                 }
                 catch (ArgumentException ex)
                 {
-                    ExceptionHandler.Handle(ex);
+                    Helper.ExceptionHandler(ex);
                     break;
                 }
                 catch (IOException ex)
                 {
-                    ExceptionHandler.Handle(ex);
+                    Helper.ExceptionHandler(ex);
                     break;
                 }
                 catch (UnauthorizedAccessException ex)
                 {
-                    ExceptionHandler.Handle(ex);
+                    Helper.ExceptionHandler(ex);
                     break;
                 }
                 catch (System.Text.Json.JsonException ex)
                 {
-                    ExceptionHandler.Handle(ex);
+                    Helper.ExceptionHandler(ex);
                     break;
                 }
                 catch (NotSupportedException ex)
                 {
-                    ExceptionHandler.Handle(ex);
+                    Helper.ExceptionHandler(ex);
                     break;
                 }
                 catch (Exception ex)
                 {
-                    ExceptionHandler.Handle(ex);
+                    Helper.ExceptionHandler(ex);
                     break;
                 }
             }
 
             Shutdown();
+        }
+
+        private static void HandleInstall()
+        {
+            try
+            {
+                AdminUtils.InstallApplicationFiles();
+                AdminUtils.AddLockFolderContextMenu();
+                AdminUtils.AddUnlockFolderContextMenu();
+                AdminUtils.AddPermanentUnlockFolderContextMenu();
+            }
+            catch (Exception ex)
+            {
+                Helper.ExceptionHandler(ex);
+            }
+        }
+
+        private static void HandleUninstall()
+        {
+            try
+            {
+                // Show confirmation dialog
+                var result = MessageBox.Show(
+                    "Uninstalling WinFolderLock will permanently unlock all currently locked folders.\n\nDo you want to continue?",
+                    "WinFolderLock - Uninstall Confirmation",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result != MessageBoxResult.Yes)
+                {
+                    // User cancelled uninstall - exit with code 1
+                    Environment.Exit(1);
+                    return;
+                }
+
+                // Unlock all locked folders
+                UnlockAllFolders();
+
+                // Remove registry entries and application files
+                AdminUtils.RemoveLockFolderContextMenu();
+                AdminUtils.RemoveUnlockFolderContextMenu();
+                AdminUtils.RemovePermanentUnlockFolderContextMenu();
+                AdminUtils.RemoveInstalledApplicationFiles();
+
+                // Successfully uninstalled - exit with code 0
+                Environment.Exit(0);
+            }
+            catch (Exception ex)
+            {
+                Helper.ExceptionHandler(ex);
+                // Error occurred - exit with code 2
+                Environment.Exit(2);
+            }
+        }
+
+        private static void UnlockAllFolders()
+        {
+            var entries = LoadPasswordEntries();
+            if (entries.Count == 0)
+            {
+                return; // No folders to unlock
+            }
+
+            int successCount = 0;
+            int failureCount = 0;
+
+            foreach (var entry in entries)
+            {
+                try
+                {
+                    var lockedFilePath = Path.Combine(
+                        Path.GetDirectoryName(entry.DirectoryLocation) ?? Environment.CurrentDirectory,
+                        entry.FolderName + ".wflck");
+
+                    if (File.Exists(lockedFilePath))
+                    {
+                        var destinationFolderPath = entry.DirectoryLocation;
+                        if (!Directory.Exists(destinationFolderPath))
+                        {
+                            FolderLocker.UnlockFolder(lockedFilePath, destinationFolderPath, deleteLockedFile: true);
+                            successCount++;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Helper.LogError(ex);
+                    failureCount++;
+                }
+            }
+
+            // Clear password entries
+            if (successCount > 0 || failureCount == 0)
+            {
+                try
+                {
+                    File.Delete(PasswordsFilePath);
+                }
+                catch (Exception ex)
+                {
+                    Helper.LogError(ex);
+                }
+            }
         }
 
         protected override void OnExit(ExitEventArgs e)
@@ -349,7 +471,46 @@ namespace WinFolderLock
                 return [];
             }
 
-            return JsonSerializer.Deserialize<List<PasswordEntry>>(json) ?? [];
+            var entries = JsonSerializer.Deserialize<List<PasswordEntry>>(json) ?? [];
+            return entries;
+        }
+
+        private static bool IsShellWindowShowingPath(string path)
+        {
+            try
+            {
+                var shellType = Type.GetTypeFromProgID("Shell.Application");
+                if (shellType == null) return false;
+
+                object? shell = Activator.CreateInstance(shellType);
+                if (shell == null) return false;
+
+                foreach (dynamic window in ((dynamic)shell).Windows())
+                {
+                    try
+                    {
+                        string? locationUrl = window.LocationURL as string;
+                        if (string.IsNullOrWhiteSpace(locationUrl)) continue;
+
+                        string localPath;
+                        try { localPath = new Uri(locationUrl).LocalPath; } catch { localPath = locationUrl; }
+                        if (string.IsNullOrWhiteSpace(localPath)) continue;
+
+                        var normalizedLocal = Path.GetFullPath(localPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        var normalizedTarget = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+                        if (string.Equals(normalizedLocal, normalizedTarget, StringComparison.OrdinalIgnoreCase) ||
+                            normalizedLocal.StartsWith(normalizedTarget + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return true;
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            return false;
         }
 
         private sealed class PasswordEntry

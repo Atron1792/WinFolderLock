@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.Diagnostics;
+using System.Windows;
 using System.Windows.Media;
 
 namespace WinFolderLock
@@ -12,39 +13,64 @@ namespace WinFolderLock
 
         private void OnInstallClicked(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                // Register both folder and .wflck file context menu entries for the current user
-                AdminUtils.AddLockFolderContextMenu();
-                AdminUtils.AddUnlockFolderContextMenu();
-                AdminUtils.AddPermanentUnlockFolderContextMenu();
-
-                ConfirmationText.Foreground = Brushes.White;
-                ConfirmationText.Text = "WinFolderLock installed successfully.";
-            }
-            catch (InvalidOperationException ex)
-            {
-                ExceptionHandler.Handle(ex);
-                ConfirmationText.Foreground = Brushes.Red;
-                ConfirmationText.Text = ex.Message;
-            }
-            catch (Exception ex)
-            {
-                ExceptionHandler.Handle(ex);
-                ConfirmationText.Foreground = Brushes.Red;
-                ConfirmationText.Text = "Installation failed. See error details.";
-            }
+            RunElevatedMaintenanceAction("/install");
         }
 
         private void OnUninstallClicked(object sender, RoutedEventArgs e)
         {
-            // Remove both registrations
-            AdminUtils.RemoveLockFolderContextMenu();
-            AdminUtils.RemoveUnlockFolderContextMenu();
-            AdminUtils.RemovePermanentUnlockFolderContextMenu();
+            RunElevatedMaintenanceAction("/uninstall");
+        }
 
-            ConfirmationText.Foreground = Brushes.White;
-    ConfirmationText.Text = "WinFolderLock uninstalled successfully.";
-}
+        private void RunElevatedMaintenanceAction(string argument)
+        {
+            try
+            {
+                var executablePath = Environment.ProcessPath;
+                if (string.IsNullOrWhiteSpace(executablePath))
+                {
+                    throw new InvalidOperationException("Could not determine the application path.");
+                }
+
+                var process = Process.Start(new ProcessStartInfo
+                {
+                    FileName = executablePath,
+                    Arguments = argument,
+                    UseShellExecute = true,
+                    Verb = "runas"
+                }) ?? throw new InvalidOperationException("The administrator prompt could not be started.");
+
+                // Wait for the elevated process to complete
+                process.WaitForExit();
+
+                // Check exit code to determine success
+                bool isInstall = argument.Equals("/install", StringComparison.OrdinalIgnoreCase);
+                ConfirmationText.Foreground = Brushes.White;
+
+                if (process.ExitCode == 0)
+                {
+                    ConfirmationText.Text = isInstall
+                        ? "WinFolderLock installed successfully."
+                        : "WinFolderLock uninstalled successfully.";
+                }
+                else if (process.ExitCode == 1)
+                {
+                    ConfirmationText.Foreground = Brushes.Orange;
+                    ConfirmationText.Text = isInstall
+                        ? "Installation cancelled."
+                        : "Uninstallation cancelled.";
+                }
+                else
+                {
+                    ConfirmationText.Foreground = Brushes.Red;
+                    ConfirmationText.Text = "An error occurred during the operation.";
+                }
+            }
+            catch (Exception ex)
+            {
+                Helper.ExceptionHandler(ex);
+                ConfirmationText.Foreground = Brushes.Red;
+                ConfirmationText.Text = ex.Message;
+            }
+        }
     }
 }

@@ -4,9 +4,16 @@ using System.Windows;
 
 namespace WinFolderLock
 {
-    internal static class ExceptionHandler
+    public enum WindowMode
     {
-        public static void Handle(Exception ex)
+        LockFolder,
+        UnlockFolder,
+        PermanentlyUnlockFolder
+    }
+
+    internal static class Helper
+    {
+        public static void ExceptionHandler(Exception ex)
         {
             string message = ex switch
             {
