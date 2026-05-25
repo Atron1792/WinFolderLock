@@ -9,6 +9,18 @@
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>Resources\Install.ico</ApplicationIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/Atron1792/WinFolderLock</RepositoryUrl>
+    <Copyright>GPL-3.0 License</Copyright>
+    <Title>WinFolderLock</Title>
+    <AssemblyTitle>WinFolderLock</AssemblyTitle>
+    <RootNamespace>WinFolderLock</RootNamespace>
+    <FileVersion>1.0.0</FileVersion>
+    <AssemblyVersion>1.0.0</AssemblyVersion>
+    <PackageIcon></PackageIcon>
+    <Description>A UI based folder locking system for Windows 10/11.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -36,6 +48,17 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="LICENSE.txt">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>
