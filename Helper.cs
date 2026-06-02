@@ -28,7 +28,7 @@ namespace WinFolderLock
                 message += $"\n\nDetails: {ex.GetBaseException().Message}";
             }
 
-            MessageBox.Show(message, "WinFolderLock Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            _ = MessageBox.Show(message, "WinFolderLock Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
         public static void LogError(Exception ex)

@@ -25,13 +25,13 @@ namespace WinFolderLock
         {
             try
             {
-                var executablePath = Environment.ProcessPath;
+                string? executablePath = Environment.ProcessPath;
                 if (string.IsNullOrWhiteSpace(executablePath))
                 {
                     throw new InvalidOperationException("Could not determine the application path.");
                 }
 
-                var process = Process.Start(new ProcessStartInfo
+                Process process = Process.Start(new ProcessStartInfo
                 {
                     FileName = executablePath,
                     Arguments = argument,

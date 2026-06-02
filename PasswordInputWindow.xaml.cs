@@ -27,11 +27,20 @@ namespace WinFolderLock
             };
         }
 
-        private void ShowPasswordButton_PreviewMouseDown(object sender, MouseButtonEventArgs e) => SwitchPasswordVisibility(reveal: true);
+        private void ShowPasswordButton_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            SwitchPasswordVisibility(reveal: true);
+        }
 
-        private void ShowPasswordButton_PreviewMouseUp(object sender, MouseButtonEventArgs e) => SwitchPasswordVisibility(reveal: false);
+        private void ShowPasswordButton_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            SwitchPasswordVisibility(reveal: false);
+        }
 
-        private void ShowPasswordButton_MouseLeave(object sender, MouseEventArgs e) => SwitchPasswordVisibility(reveal: false);
+        private void ShowPasswordButton_MouseLeave(object sender, MouseEventArgs e)
+        {
+            SwitchPasswordVisibility(reveal: false);
+        }
 
         private void SwitchPasswordVisibility(bool reveal)
         {
@@ -55,7 +64,10 @@ namespace WinFolderLock
             DialogResult = true;
         }
 
-        private void CancelButton_Click(object sender, RoutedEventArgs e) => DialogResult = false;
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+        }
     }
 }
 

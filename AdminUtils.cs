@@ -1,7 +1,6 @@
 using Microsoft.Win32;
 using System.IO;
 using System.Security.Principal;
-using System.Windows;
 
 namespace WinFolderLock;
 
@@ -34,13 +33,13 @@ internal static partial class AdminUtils
 
     internal static void NotifyShellOfChange(string path)
     {
-        try 
-        { 
+        try
+        {
             // Notify about the path itself
             SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
 
             // Also notify about the parent directory to refresh the folder view
-            var parentDir = Path.GetDirectoryName(path);
+            string? parentDir = Path.GetDirectoryName(path);
             if (!string.IsNullOrWhiteSpace(parentDir))
             {
                 System.Threading.Thread.Sleep(100); // Give the system a moment to complete extraction
@@ -52,25 +51,25 @@ internal static partial class AdminUtils
 
     internal static bool IsRunningAsAdministrator()
     {
-        using var identity = WindowsIdentity.GetCurrent();
-        var principal = new WindowsPrincipal(identity);
+        using WindowsIdentity identity = WindowsIdentity.GetCurrent();
+        WindowsPrincipal principal = new(identity);
         return principal.IsInRole(WindowsBuiltInRole.Administrator);
     }
 
     internal static void AddLockFolderContextMenu()
     {
-        var executablePath = GetInstalledExecutablePath();
-        var iconPath = GetContextMenuIconPath();
+        string executablePath = GetInstalledExecutablePath();
+        string iconPath = GetContextMenuIconPath();
 
         Registry.CurrentUser.DeleteSubKeyTree(ContextMenuKeyPath, throwOnMissingSubKey: false);
 
-        using var menuKey = Registry.CurrentUser.CreateSubKey(ContextMenuKeyPath);
+        using RegistryKey menuKey = Registry.CurrentUser.CreateSubKey(ContextMenuKeyPath);
         ArgumentNullException.ThrowIfNull(menuKey);
 
         menuKey.SetValue(string.Empty, "Lock Folder", RegistryValueKind.String);
         menuKey.SetValue("Icon", iconPath, RegistryValueKind.String);
 
-        using var commandKey = Registry.CurrentUser.CreateSubKey(ContextMenuCommandKeyPath);
+        using RegistryKey commandKey = Registry.CurrentUser.CreateSubKey(ContextMenuCommandKeyPath);
         ArgumentNullException.ThrowIfNull(commandKey);
 
         commandKey.SetValue(string.Empty, $"\"{executablePath}\" \"%1\"", RegistryValueKind.String);
@@ -86,8 +85,8 @@ internal static partial class AdminUtils
 
     internal static void AddUnlockFolderContextMenu()
     {
-        var executablePath = GetInstalledExecutablePath();
-        var wflckIconPath = GetInstalledResourcePath("LockedWIn11.ico");
+        string executablePath = GetInstalledExecutablePath();
+        string wflckIconPath = GetInstalledResourcePath("LockedWIn11.ico");
 
         // Register .wflck extension under HKCU so it is visible to the current user without requiring admin.
         const string extKey = @"Software\Classes\.wflck";
@@ -95,39 +94,39 @@ internal static partial class AdminUtils
         const string progIdKey = @"Software\Classes\WinFolderLock.File";
 
         try
-            {
-                Registry.CurrentUser.DeleteSubKeyTree(extKey, throwOnMissingSubKey: false);
-                Registry.CurrentUser.DeleteSubKeyTree(progIdKey, throwOnMissingSubKey: false);
-            }
-            catch (Exception ex) { Helper.LogError(ex); }
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(extKey, throwOnMissingSubKey: false);
+            Registry.CurrentUser.DeleteSubKeyTree(progIdKey, throwOnMissingSubKey: false);
+        }
+        catch (Exception ex) { Helper.LogError(ex); }
 
-        using (var ext = Registry.CurrentUser.CreateSubKey(extKey))
+        using (RegistryKey ext = Registry.CurrentUser.CreateSubKey(extKey))
         {
             ArgumentNullException.ThrowIfNull(ext);
             ext.SetValue(string.Empty, progId, RegistryValueKind.String);
         }
 
-        using (var p = Registry.CurrentUser.CreateSubKey(progIdKey))
+        using (RegistryKey p = Registry.CurrentUser.CreateSubKey(progIdKey))
         {
             ArgumentNullException.ThrowIfNull(p);
             p.SetValue(string.Empty, "WFL Locked Folder", RegistryValueKind.String);
         }
 
         // Default icon for the ProgID
-        using (var defIcon = Registry.CurrentUser.CreateSubKey(progIdKey + "\\DefaultIcon"))
+        using (RegistryKey defIcon = Registry.CurrentUser.CreateSubKey(progIdKey + "\\DefaultIcon"))
         {
             ArgumentNullException.ThrowIfNull(defIcon);
             defIcon.SetValue(string.Empty, wflckIconPath, RegistryValueKind.String);
         }
 
         // Shell open command for ProgID (default action on double-click) - label it "Unlock Folder"
-        using (var shellOpen = Registry.CurrentUser.CreateSubKey(progIdKey + "\\shell\\open"))
+        using (RegistryKey shellOpen = Registry.CurrentUser.CreateSubKey(progIdKey + "\\shell\\open"))
         {
             ArgumentNullException.ThrowIfNull(shellOpen);
             shellOpen.SetValue(string.Empty, "Unlock Folder", RegistryValueKind.String);
         }
 
-        using (var openCmd = Registry.CurrentUser.CreateSubKey(progIdKey + "\\shell\\open\\command"))
+        using (RegistryKey openCmd = Registry.CurrentUser.CreateSubKey(progIdKey + "\\shell\\open\\command"))
         {
             ArgumentNullException.ThrowIfNull(openCmd);
             openCmd.SetValue(string.Empty, $"\"{executablePath}\" \"%1\"", RegistryValueKind.String);
@@ -139,13 +138,13 @@ internal static partial class AdminUtils
 
         Registry.CurrentUser.DeleteSubKeyTree(extMenuKey, throwOnMissingSubKey: false);
 
-        using var menuKey = Registry.CurrentUser.CreateSubKey(extMenuKey);
+        using RegistryKey menuKey = Registry.CurrentUser.CreateSubKey(extMenuKey);
         ArgumentNullException.ThrowIfNull(menuKey);
 
         menuKey.SetValue(string.Empty, "Permanently Unlock Folder", RegistryValueKind.String);
         menuKey.SetValue("Icon", wflckIconPath, RegistryValueKind.String);
 
-        using var commandKey = Registry.CurrentUser.CreateSubKey(extCommandKeyPath);
+        using RegistryKey commandKey = Registry.CurrentUser.CreateSubKey(extCommandKeyPath);
         ArgumentNullException.ThrowIfNull(commandKey);
 
         // Command includes a /permunlock switch to indicate permanent unlock behavior
@@ -165,8 +164,8 @@ internal static partial class AdminUtils
 
     internal static void AddPermanentUnlockFolderContextMenu()
     {
-        var executablePath = GetInstalledExecutablePath();
-        var unlockedIconPath = GetInstalledResourcePath("Unlocked.ico");
+        string executablePath = GetInstalledExecutablePath();
+        string unlockedIconPath = GetInstalledResourcePath("Unlocked.ico");
 
         // Register permanent unlock as a context menu entry for the ProgID (not extension)
         const string progIdKey = @"Software\Classes\WinFolderLock.File";
@@ -175,13 +174,13 @@ internal static partial class AdminUtils
 
         Registry.CurrentUser.DeleteSubKeyTree(extMenuKey, throwOnMissingSubKey: false);
 
-        using var menuKey = Registry.CurrentUser.CreateSubKey(extMenuKey);
+        using RegistryKey menuKey = Registry.CurrentUser.CreateSubKey(extMenuKey);
         ArgumentNullException.ThrowIfNull(menuKey);
 
         menuKey.SetValue(string.Empty, "Permanently Unlock Folder", RegistryValueKind.String);
         menuKey.SetValue("Icon", unlockedIconPath, RegistryValueKind.String);
 
-        using var commandKey = Registry.CurrentUser.CreateSubKey(extCommandKeyPath);
+        using RegistryKey commandKey = Registry.CurrentUser.CreateSubKey(extCommandKeyPath);
         ArgumentNullException.ThrowIfNull(commandKey);
 
         // Command includes a /permunlock switch to indicate permanent unlock behavior
@@ -200,21 +199,21 @@ internal static partial class AdminUtils
 
     internal static void InstallApplicationFiles()
     {
-        var installDirectoryPath = GetInstallDirectoryPath();
+        string installDirectoryPath = GetInstallDirectoryPath();
         if (Directory.Exists(installDirectoryPath))
         {
             Directory.Delete(installDirectoryPath, recursive: true);
         }
 
-        Directory.CreateDirectory(installDirectoryPath);
+        _ = Directory.CreateDirectory(installDirectoryPath);
 
-        var sourceDirectoryPath = GetCurrentExecutableDirectoryPath();
+        string sourceDirectoryPath = GetCurrentExecutableDirectoryPath();
         CopyDirectoryContents(sourceDirectoryPath, installDirectoryPath);
     }
 
     internal static void RemoveInstalledApplicationFiles()
     {
-        var installDirectoryPath = GetInstallDirectoryPath();
+        string installDirectoryPath = GetInstallDirectoryPath();
         if (Directory.Exists(installDirectoryPath))
         {
             Directory.Delete(installDirectoryPath, recursive: true);
@@ -233,29 +232,29 @@ internal static partial class AdminUtils
 
     internal static string GetInstalledExecutablePath()
     {
-        var installedExecutablePath = Path.Combine(GetInstallDirectoryPath(), GetCurrentExecutableFileName());
+        string installedExecutablePath = Path.Combine(GetInstallDirectoryPath(), GetCurrentExecutableFileName());
         return File.Exists(installedExecutablePath) ? installedExecutablePath : GetCurrentExecutablePath();
     }
 
     private static string GetInstalledResourcePath(string resourceFileName)
     {
-        var resourcePath = Path.Combine(GetInstalledResourcesDirectoryPath(), resourceFileName);
+        string resourcePath = Path.Combine(GetInstalledResourcesDirectoryPath(), resourceFileName);
         if (File.Exists(resourcePath))
         {
             return resourcePath;
         }
 
-        var execDir = GetCurrentExecutableDirectoryPath();
+        string execDir = GetCurrentExecutableDirectoryPath();
 
         // First check Resources subfolder next to the executable (common layout)
-        var candidateInResources = Path.Combine(execDir, ResourcesFolderName, resourceFileName);
+        string candidateInResources = Path.Combine(execDir, ResourcesFolderName, resourceFileName);
         if (File.Exists(candidateInResources))
         {
             return candidateInResources;
         }
 
         // Next check for the file copied directly into the output directory
-        var candidateInOutput = Path.Combine(execDir, resourceFileName);
+        string candidateInOutput = Path.Combine(execDir, resourceFileName);
         if (File.Exists(candidateInOutput))
         {
             return candidateInOutput;
@@ -267,24 +266,18 @@ internal static partial class AdminUtils
 
     private static string GetCurrentExecutablePath()
     {
-        var executablePath = Environment.ProcessPath;
-        if (string.IsNullOrWhiteSpace(executablePath))
-        {
-            throw new InvalidOperationException("Could not resolve executable path for context menu registration.");
-        }
-
-        return executablePath;
+        string? executablePath = Environment.ProcessPath;
+        return string.IsNullOrWhiteSpace(executablePath)
+            ? throw new InvalidOperationException("Could not resolve executable path for context menu registration.")
+            : executablePath;
     }
 
     private static string GetCurrentExecutableDirectoryPath()
     {
-        var executableDirectoryPath = Path.GetDirectoryName(GetCurrentExecutablePath());
-        if (string.IsNullOrWhiteSpace(executableDirectoryPath))
-        {
-            throw new InvalidOperationException("Could not resolve executable directory for installation.");
-        }
-
-        return executableDirectoryPath;
+        string? executableDirectoryPath = Path.GetDirectoryName(GetCurrentExecutablePath());
+        return string.IsNullOrWhiteSpace(executableDirectoryPath)
+            ? throw new InvalidOperationException("Could not resolve executable directory for installation.")
+            : executableDirectoryPath;
     }
 
     private static string GetCurrentExecutableFileName()
@@ -294,21 +287,21 @@ internal static partial class AdminUtils
 
     private static void CopyDirectoryContents(string sourceDirectoryPath, string destinationDirectoryPath)
     {
-        foreach (var filePath in Directory.EnumerateFiles(sourceDirectoryPath))
+        foreach (string filePath in Directory.EnumerateFiles(sourceDirectoryPath))
         {
             if (Path.GetExtension(filePath).Equals(".pdb", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            var destinationPath = Path.Combine(destinationDirectoryPath, Path.GetFileName(filePath));
+            string destinationPath = Path.Combine(destinationDirectoryPath, Path.GetFileName(filePath));
             File.Copy(filePath, destinationPath, overwrite: true);
         }
 
-        foreach (var directoryPath in Directory.EnumerateDirectories(sourceDirectoryPath))
+        foreach (string directoryPath in Directory.EnumerateDirectories(sourceDirectoryPath))
         {
-            var destinationPath = Path.Combine(destinationDirectoryPath, Path.GetFileName(directoryPath));
-            Directory.CreateDirectory(destinationPath);
+            string destinationPath = Path.Combine(destinationDirectoryPath, Path.GetFileName(directoryPath));
+            _ = Directory.CreateDirectory(destinationPath);
             CopyDirectoryContents(directoryPath, destinationPath);
         }
     }

@@ -21,15 +21,15 @@ namespace WinFolderLock
         {
             base.OnStartup(e);
 
-            var isWizardLaunch = e.Args.Length == 0;
+            bool isWizardLaunch = e.Args.Length == 0;
             if (isWizardLaunch)
             {
-                _wizardMutex = new Mutex(initiallyOwned: true, WizardInstanceMutexName, out var isFirstWizardInstance);
+                _wizardMutex = new Mutex(initiallyOwned: true, WizardInstanceMutexName, out bool isFirstWizardInstance);
                 if (!isFirstWizardInstance)
                 {
                     _wizardMutex.Dispose();
 
-                    MessageBox.Show("A wizard is already running.", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _ = MessageBox.Show("A wizard is already running.", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Information);
                     Shutdown();
                     return;
                 }
@@ -67,7 +67,7 @@ namespace WinFolderLock
                 return;
             }
 
-            var filePath = e.Args[fileArgIndex];
+            string filePath = e.Args[fileArgIndex];
 
             // Determine the appropriate window mode based on whether it's a file or folder
             WindowMode mode = WindowMode.LockFolder;
@@ -80,7 +80,7 @@ namespace WinFolderLock
 
             while (true)
             {
-                var isConfirmed = passwordWindow.ShowDialog() == true;
+                bool isConfirmed = passwordWindow.ShowDialog() == true;
 
                 if (!isConfirmed)
                 {
@@ -88,28 +88,28 @@ namespace WinFolderLock
                     return;
                 }
 
-                var password = passwordWindow.Password;
+                string password = passwordWindow.Password;
 
                 if (string.IsNullOrWhiteSpace(password))
                 {
-                    MessageBox.Show("Password cannot be empty. Please try again.", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    _ = MessageBox.Show("Password cannot be empty. Please try again.", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Warning);
                     passwordWindow = new(mode);
                     continue;
                 }
 
                 // Validate password if unlocking
-                if (mode == WindowMode.UnlockFolder || mode == WindowMode.PermanentlyUnlockFolder)
+                if (mode is WindowMode.UnlockFolder or WindowMode.PermanentlyUnlockFolder)
                 {
-                    var entries = LoadPasswordEntries();
-                    var lockedFileInfo = new System.IO.FileInfo(filePath);
-                    var folderName = Path.GetFileNameWithoutExtension(filePath);
+                    List<PasswordEntry> entries = LoadPasswordEntries();
+                    FileInfo lockedFileInfo = new(filePath);
+                    string folderName = Path.GetFileNameWithoutExtension(filePath);
 
-                    var entry = entries.FirstOrDefault(x => 
+                    PasswordEntry? entry = entries.FirstOrDefault(x =>
                         x.FolderName.Equals(folderName, StringComparison.OrdinalIgnoreCase));
 
                     if (entry == null || !entry.Password.Equals(password))
                     {
-                        MessageBox.Show("Incorrect password. Please try again.", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Error);
+                        _ = MessageBox.Show("Incorrect password. Please try again.", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Error);
                         passwordWindow = new(mode);
                         continue;
                     }
@@ -123,25 +123,25 @@ namespace WinFolderLock
                         // Lock folder
                         SavePasswordEntry(filePath, password);
 
-                        var normalizedDirectoryPath = Path.GetFullPath(filePath);
-                        var trimmedDirectoryPath = normalizedDirectoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                        var folderNameForLock = Path.GetFileName(trimmedDirectoryPath);
+                        string normalizedDirectoryPath = Path.GetFullPath(filePath);
+                        string trimmedDirectoryPath = normalizedDirectoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        string folderNameForLock = Path.GetFileName(trimmedDirectoryPath);
                         if (string.IsNullOrWhiteSpace(folderNameForLock))
                         {
                             folderNameForLock = trimmedDirectoryPath;
                         }
 
-                        var parentDir = Path.GetDirectoryName(trimmedDirectoryPath);
+                        string? parentDir = Path.GetDirectoryName(trimmedDirectoryPath);
                         if (string.IsNullOrWhiteSpace(parentDir))
                         {
                             parentDir = Path.GetPathRoot(trimmedDirectoryPath) ?? Environment.CurrentDirectory;
                         }
 
-                        var lockedFilePath = Path.Combine(parentDir, folderNameForLock + ".wflck");
+                        string lockedFilePath = Path.Combine(parentDir, folderNameForLock + ".wflck");
 
                         if (File.Exists(lockedFilePath))
                         {
-                            MessageBox.Show($"A locked file already exists: {lockedFilePath}", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Error);
+                            _ = MessageBox.Show($"A locked file already exists: {lockedFilePath}", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
                         else
                         {
@@ -151,7 +151,7 @@ namespace WinFolderLock
                     else if (mode == WindowMode.UnlockFolder)
                     {
                         // Temporary unlock - extract to an app-managed session folder and open in Explorer
-                        var sessionFolderPath = FolderLocker.UnlockFolderToTemp(filePath);
+                        string sessionFolderPath = FolderLocker.UnlockFolderToTemp(filePath);
 
                         // Launch Explorer to the session folder in a new window
                         try
@@ -166,7 +166,7 @@ namespace WinFolderLock
                         catch (Exception ex)
                         {
                             Helper.ExceptionHandler(ex);
-                            MessageBox.Show($"Could not open Explorer for the session folder: {ex.Message}", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Error);
+                            _ = MessageBox.Show($"Could not open Explorer for the session folder: {ex.Message}", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
 
                         // Automatically re-lock after the Explorer window(s) showing the session folder are closed
@@ -231,10 +231,10 @@ namespace WinFolderLock
                         // Clean up all session folders after the session
                         try
                         {
-                            var sessionsRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WinFolderLock", "Sessions");
+                            string sessionsRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WinFolderLock", "Sessions");
                             if (Directory.Exists(sessionsRoot))
                             {
-                                foreach (var dir in Directory.EnumerateDirectories(sessionsRoot))
+                                foreach (string dir in Directory.EnumerateDirectories(sessionsRoot))
                                 {
                                     try { Directory.Delete(dir, recursive: true); } catch { }
                                 }
@@ -245,18 +245,18 @@ namespace WinFolderLock
                     else if (mode == WindowMode.PermanentlyUnlockFolder)
                     {
                         // Permanent unlock (extract and delete .wflck file)
-                        var destinationFolderPath = Path.GetDirectoryName(filePath);
+                        string? destinationFolderPath = Path.GetDirectoryName(filePath);
                         if (string.IsNullOrWhiteSpace(destinationFolderPath))
                         {
                             destinationFolderPath = Environment.CurrentDirectory;
                         }
 
-                        var folderName = Path.GetFileNameWithoutExtension(filePath);
+                        string folderName = Path.GetFileNameWithoutExtension(filePath);
                         destinationFolderPath = Path.Combine(destinationFolderPath, folderName);
 
                         if (Directory.Exists(destinationFolderPath))
                         {
-                            MessageBox.Show($"Destination folder already exists: {destinationFolderPath}", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Error);
+                            _ = MessageBox.Show($"Destination folder already exists: {destinationFolderPath}", "WinFolderLock", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
                         else
                         {
@@ -333,7 +333,7 @@ namespace WinFolderLock
             try
             {
                 // Show confirmation dialog
-                var result = MessageBox.Show(
+                MessageBoxResult result = MessageBox.Show(
                     "Uninstalling WinFolderLock will permanently unlock all currently locked folders.\n\nDo you want to continue?",
                     "WinFolderLock - Uninstall Confirmation",
                     MessageBoxButton.YesNo,
@@ -368,7 +368,7 @@ namespace WinFolderLock
 
         private static void UnlockAllFolders()
         {
-            var entries = LoadPasswordEntries();
+            List<PasswordEntry> entries = LoadPasswordEntries();
             if (entries.Count == 0)
             {
                 return; // No folders to unlock
@@ -377,17 +377,17 @@ namespace WinFolderLock
             int successCount = 0;
             int failureCount = 0;
 
-            foreach (var entry in entries)
+            foreach (PasswordEntry entry in entries)
             {
                 try
                 {
-                    var lockedFilePath = Path.Combine(
+                    string lockedFilePath = Path.Combine(
                         Path.GetDirectoryName(entry.DirectoryLocation) ?? Environment.CurrentDirectory,
                         entry.FolderName + ".wflck");
 
                     if (File.Exists(lockedFilePath))
                     {
-                        var destinationFolderPath = entry.DirectoryLocation;
+                        string destinationFolderPath = entry.DirectoryLocation;
                         if (!Directory.Exists(destinationFolderPath))
                         {
                             FolderLocker.UnlockFolder(lockedFilePath, destinationFolderPath, deleteLockedFile: true);
@@ -436,25 +436,25 @@ namespace WinFolderLock
                 throw new ArgumentException("Password is required.", nameof(folderPassword));
             }
 
-            var normalizedDirectoryPath = Path.GetFullPath(directoryLocation);
-            var trimmedDirectoryPath = normalizedDirectoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var folderName = Path.GetFileName(trimmedDirectoryPath);
+            string normalizedDirectoryPath = Path.GetFullPath(directoryLocation);
+            string trimmedDirectoryPath = normalizedDirectoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string folderName = Path.GetFileName(trimmedDirectoryPath);
             if (string.IsNullOrWhiteSpace(folderName))
             {
                 folderName = trimmedDirectoryPath;
             }
 
-            Directory.CreateDirectory(ProgramDataDirectoryPath);
+            _ = Directory.CreateDirectory(ProgramDataDirectoryPath);
 
-            var entries = LoadPasswordEntries();
-            var entry = new PasswordEntry
+            List<PasswordEntry> entries = LoadPasswordEntries();
+            PasswordEntry entry = new()
             {
                 FolderName = folderName,
                 DirectoryLocation = normalizedDirectoryPath,
                 Password = folderPassword
             };
 
-            var existingIndex = entries.FindIndex(x => string.Equals(x.DirectoryLocation, normalizedDirectoryPath, StringComparison.OrdinalIgnoreCase));
+            int existingIndex = entries.FindIndex(x => string.Equals(x.DirectoryLocation, normalizedDirectoryPath, StringComparison.OrdinalIgnoreCase));
             if (existingIndex >= 0)
             {
                 entries[existingIndex] = entry;
@@ -464,7 +464,7 @@ namespace WinFolderLock
                 entries.Add(entry);
             }
 
-            var json = JsonSerializer.Serialize(entries, JsonSerializerOptions);
+            string json = JsonSerializer.Serialize(entries, JsonSerializerOptions);
             File.WriteAllText(PasswordsFilePath, json);
         }
 
@@ -475,13 +475,13 @@ namespace WinFolderLock
                 return [];
             }
 
-            var json = File.ReadAllText(PasswordsFilePath);
+            string json = File.ReadAllText(PasswordsFilePath);
             if (string.IsNullOrWhiteSpace(json))
             {
                 return [];
             }
 
-            var entries = JsonSerializer.Deserialize<List<PasswordEntry>>(json) ?? [];
+            List<PasswordEntry> entries = JsonSerializer.Deserialize<List<PasswordEntry>>(json) ?? [];
             return entries;
         }
 
@@ -492,10 +492,10 @@ namespace WinFolderLock
                 return;
             }
 
-            var normalizedDirectoryPath = Path.GetFullPath(directoryLocation).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string normalizedDirectoryPath = Path.GetFullPath(directoryLocation).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-            var entries = LoadPasswordEntries();
-            var index = entries.FindIndex(x => string.Equals(x.DirectoryLocation, normalizedDirectoryPath, StringComparison.OrdinalIgnoreCase));
+            List<PasswordEntry> entries = LoadPasswordEntries();
+            int index = entries.FindIndex(x => string.Equals(x.DirectoryLocation, normalizedDirectoryPath, StringComparison.OrdinalIgnoreCase));
             if (index >= 0)
             {
                 entries.RemoveAt(index);
@@ -508,7 +508,7 @@ namespace WinFolderLock
                     }
                     else
                     {
-                        var json = JsonSerializer.Serialize(entries, JsonSerializerOptions);
+                        string json = JsonSerializer.Serialize(entries, JsonSerializerOptions);
                         File.WriteAllText(PasswordsFilePath, json);
                     }
                 }
@@ -523,25 +523,37 @@ namespace WinFolderLock
         {
             try
             {
-                var shellType = Type.GetTypeFromProgID("Shell.Application");
-                if (shellType == null) return false;
+                Type? shellType = Type.GetTypeFromProgID("Shell.Application");
+                if (shellType == null)
+                {
+                    return false;
+                }
 
                 object? shell = Activator.CreateInstance(shellType);
-                if (shell == null) return false;
+                if (shell == null)
+                {
+                    return false;
+                }
 
                 foreach (dynamic window in ((dynamic)shell).Windows())
                 {
                     try
                     {
                         string? locationUrl = window.LocationURL as string;
-                        if (string.IsNullOrWhiteSpace(locationUrl)) continue;
+                        if (string.IsNullOrWhiteSpace(locationUrl))
+                        {
+                            continue;
+                        }
 
                         string localPath;
                         try { localPath = new Uri(locationUrl).LocalPath; } catch { localPath = locationUrl; }
-                        if (string.IsNullOrWhiteSpace(localPath)) continue;
+                        if (string.IsNullOrWhiteSpace(localPath))
+                        {
+                            continue;
+                        }
 
-                        var normalizedLocal = Path.GetFullPath(localPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                        var normalizedTarget = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        string normalizedLocal = Path.GetFullPath(localPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        string normalizedTarget = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
                         if (string.Equals(normalizedLocal, normalizedTarget, StringComparison.OrdinalIgnoreCase) ||
                             normalizedLocal.StartsWith(normalizedTarget + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
