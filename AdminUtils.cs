@@ -10,14 +10,6 @@ internal static partial class AdminUtils
     private const string ResourcesFolderName = "Resources";
     private const string ContextMenuKeyPath = @"Software\Classes\Directory\shell\WinFolderLock";
     private const string ContextMenuCommandKeyPath = @"Software\Classes\Directory\shell\WinFolderLock\command";
-    private static readonly string[] InstalledResourceFileNames =
-    [
-        "Install.ico",
-        "Locked.ico",
-        "LockedWin10.ico",
-        "LockedWIn11.ico",
-        "Unlocked.ico"
-    ];
 
     // P/Invoke to notify the shell about association/context menu changes so Explorer refreshes
     [System.Runtime.InteropServices.LibraryImport("shell32.dll")]
@@ -207,7 +199,7 @@ internal static partial class AdminUtils
 
         _ = Directory.CreateDirectory(installDirectoryPath);
 
-        string sourceDirectoryPath = GetCurrentExecutableDirectoryPath();
+        string sourceDirectoryPath = GetInstallSourceDirectoryPath();
         CopyDirectoryContents(sourceDirectoryPath, installDirectoryPath);
     }
 
@@ -285,15 +277,18 @@ internal static partial class AdminUtils
         return Path.GetFileName(GetCurrentExecutablePath());
     }
 
+    private static string GetInstallSourceDirectoryPath()
+    {
+        const string publishDirectoryPath = @"D:\Users\atron\Desktop\vs-repos\WinFolderLock\bin\Release\WinFolderLock";
+        return Directory.Exists(publishDirectoryPath)
+            ? publishDirectoryPath
+            : throw new DirectoryNotFoundException($"Install source directory was not found: {publishDirectoryPath}");
+    }
+
     private static void CopyDirectoryContents(string sourceDirectoryPath, string destinationDirectoryPath)
     {
         foreach (string filePath in Directory.EnumerateFiles(sourceDirectoryPath))
         {
-            if (Path.GetExtension(filePath).Equals(".pdb", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
             string destinationPath = Path.Combine(destinationDirectoryPath, Path.GetFileName(filePath));
             File.Copy(filePath, destinationPath, overwrite: true);
         }

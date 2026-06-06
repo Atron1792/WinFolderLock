@@ -278,27 +278,7 @@ namespace WinFolderLock
 
                     break; // Exit the retry loop on success
                 }
-                catch (ArgumentException ex)
-                {
-                    Helper.ExceptionHandler(ex);
-                    break;
-                }
-                catch (IOException ex)
-                {
-                    Helper.ExceptionHandler(ex);
-                    break;
-                }
-                catch (UnauthorizedAccessException ex)
-                {
-                    Helper.ExceptionHandler(ex);
-                    break;
-                }
-                catch (System.Text.Json.JsonException ex)
-                {
-                    Helper.ExceptionHandler(ex);
-                    break;
-                }
-                catch (NotSupportedException ex)
+                catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException or System.Text.Json.JsonException or NotSupportedException)
                 {
                     Helper.ExceptionHandler(ex);
                     break;
@@ -333,15 +313,12 @@ namespace WinFolderLock
             try
             {
                 // Show confirmation dialog
-                MessageBoxResult result = MessageBox.Show(
+                if (MessageBox.Show(
                     "Uninstalling WinFolderLock will permanently unlock all currently locked folders.\n\nDo you want to continue?",
                     "WinFolderLock - Uninstall Confirmation",
                     MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (result != MessageBoxResult.Yes)
+                    MessageBoxImage.Question) != MessageBoxResult.Yes)
                 {
-                    // User cancelled uninstall - exit with code 1
                     Environment.Exit(1);
                     return;
                 }

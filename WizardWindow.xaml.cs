@@ -46,24 +46,19 @@ namespace WinFolderLock
                 bool isInstall = argument.Equals("/install", StringComparison.OrdinalIgnoreCase);
                 ConfirmationText.Foreground = Brushes.White;
 
-                if (process.ExitCode == 0)
+                ConfirmationText.Text = process.ExitCode switch
                 {
-                    ConfirmationText.Text = isInstall
-                        ? "WinFolderLock installed successfully."
-                        : "WinFolderLock uninstalled successfully.";
-                }
-                else if (process.ExitCode == 1)
+                    0 => isInstall ? "WinFolderLock installed successfully." : "WinFolderLock uninstalled successfully.",
+                    1 => isInstall ? "Installation cancelled." : "Uninstallation cancelled.",
+                    _ => "An error occurred during the operation."
+                };
+
+                ConfirmationText.Foreground = process.ExitCode switch
                 {
-                    ConfirmationText.Foreground = Brushes.Orange;
-                    ConfirmationText.Text = isInstall
-                        ? "Installation cancelled."
-                        : "Uninstallation cancelled.";
-                }
-                else
-                {
-                    ConfirmationText.Foreground = Brushes.Red;
-                    ConfirmationText.Text = "An error occurred during the operation.";
-                }
+                    0 => Brushes.White,
+                    1 => Brushes.Orange,
+                    _ => Brushes.Red
+                };
             }
             catch (Exception ex)
             {
